@@ -33,7 +33,24 @@ export default function AdminMoviesPage() {
   const [movies, setMovies] = useState<Movie[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalMovies, setTotalMovies] = useState(0);
+  const moviesPerPage = 10;
   const router = useRouter();
+
+  // Fungsi untuk mengambil jumlah total film
+  const fetchTotalMovies = async () => {
+    try {
+      const { count, error } = await supabase
+        .from('movies')
+        .select('*', { count: 'exact', head: true });
+      
+      if (error) throw error;
+      setTotalMovies(count || 0);
+    } catch (err) {
+      console.error('Error fetching total movies count:', err);
+    }
+  };
 
   useEffect(() => {
     // Redirect if not logged in
@@ -63,11 +80,18 @@ export default function AdminMoviesPage() {
 
         setIsAdmin(true);
 
-        // Fetch movies
+        // Ambil jumlah total film untuk pagination
+        await fetchTotalMovies();
+
+        // Optimasi: Fetch movies dengan pagination dan hanya kolom yang diperlukan
+        const from = (currentPage - 1) * moviesPerPage;
+        const to = from + moviesPerPage - 1;
+
         const { data: moviesData, error: moviesError } = await supabase
           .from('movies')
-          .select('*')
-          .order('release_date', { ascending: false });
+          .select('id, title, poster, duration, release_date, genre, rating, is_now_showing, is_coming_soon')
+          .order('release_date', { ascending: false })
+          .range(from, to);
 
         if (moviesError) throw moviesError;
         setMovies(moviesData || []);
@@ -79,7 +103,7 @@ export default function AdminMoviesPage() {
     };
 
     checkAdminAndLoadMovies();
-  }, [user, router]);
+  }, [user, router, currentPage]);
 
   const handleDeleteMovie = async (id: string) => {
     if (!confirm('Are you sure you want to delete this movie? This action cannot be undone.')) {
@@ -111,10 +135,25 @@ export default function AdminMoviesPage() {
       // Update the movies list
       setMovies(movies.filter(movie => movie.id !== id));
       alert('Movie deleted successfully');
+      
+      // Refresh total count
+      fetchTotalMovies();
     } catch (err) {
       console.error('Error deleting movie:', err);
       alert('Failed to delete movie. Please try again.');
     }
+  };
+
+  // Fungsi untuk menangani pencarian
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1); // Reset ke halaman pertama saat pencarian
+  };
+
+  // Fungsi untuk menangani filter status
+  const handleStatusFilter = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setStatusFilter(e.target.value);
+    setCurrentPage(1); // Reset ke halaman pertama saat filter berubah
   };
 
   const filteredMovies = movies.filter(movie => {
@@ -130,10 +169,16 @@ export default function AdminMoviesPage() {
     return matchesSearch && matchesStatus;
   });
 
+  // Hitung jumlah halaman
+  const totalPages = Math.ceil(totalMovies / moviesPerPage);
+
   if (loading || !isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <p>Loading...</p>
+        <div className="flex flex-col items-center">
+          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <p className="mt-4">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -158,14 +203,14 @@ export default function AdminMoviesPage() {
                   type="text"
                   placeholder="Search by title or genre..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onChange={handleSearch}
                   className="w-full px-4 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 />
               </div>
               <div>
                 <select
                   value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
+                  onChange={handleStatusFilter}
                   className="w-full md:w-auto px-4 py-2 rounded-md border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary"
                 >
                   <option value="all">All Status</option>
@@ -205,6 +250,8 @@ export default function AdminMoviesPage() {
                                   alt={movie.title}
                                   fill
                                   className="object-cover"
+                                  loading="lazy"
+                                  sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                                 />
                               ) : (
                                 <div className="w-full h-full bg-muted flex items-center justify-center">
@@ -256,6 +303,37 @@ export default function AdminMoviesPage() {
                     ))}
                   </tbody>
                 </table>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center mt-6">
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      
+                      <div className="flex items-center px-4">
+                        <span className="text-sm">
+                          Page {currentPage} of {totalPages}
+                        </span>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -18,6 +18,7 @@ export default function NewMoviePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [success, setSuccess] = useState<string | null>(null); // Tambahkan state untuk pesan sukses
   const router = useRouter();
 
   // Form state
@@ -663,7 +664,7 @@ export default function NewMoviePage() {
       let finalPosterUrl = posterUrl || placeholderImageUrl;
       let finalBackdropUrl = backdropUrl || placeholderImageUrl;
       let needsUpdate = false;
-      let uploadErrors = [];
+      let uploadErrors: any[] = [];
       
       if (posterFile) {
         console.log('Uploading poster image...');
@@ -802,11 +803,14 @@ export default function NewMoviePage() {
       // Log sukses dan redirect ke halaman admin movies
       console.log('Movie created successfully with ID:', movieId);
       
-      // Tampilkan pesan sukses (opsional)
-      // setSuccess('Movie created successfully!');
+      // Tampilkan pesan sukses
+      setSuccess('Film berhasil ditambahkan! Mengalihkan ke halaman daftar film...');
+      setSubmitting(false);
       
-      // Redirect to movies admin page
-      router.push('/admin/movies');
+      // Tunggu sebentar sebelum redirect untuk menampilkan pesan sukses
+      setTimeout(() => {
+        router.push('/admin/movies');
+      }, 1500);
     } catch (err: any) {
       console.error('Error creating movie:', err);
       
@@ -920,6 +924,12 @@ export default function NewMoviePage() {
             {error && (
               <div className="mb-6 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
                 {error}
+              </div>
+            )}
+            
+            {success && (
+              <div className="mb-6 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                {success}
               </div>
             )}
 
